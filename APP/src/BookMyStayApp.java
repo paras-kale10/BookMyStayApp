@@ -1,14 +1,16 @@
 /**
- * UseCase2RoomInitialization
+ * UseCase4RoomSearch
  *
- * This class demonstrates basic room modeling using abstraction,
- * inheritance, and static availability variables.
+ * This class demonstrates read-only room search functionality
+ * using centralized inventory without modifying system state.
  *
  * @author Paras
- * @version 2.1
+ * @version 4.0
  */
 
-// Abstract class
+import java.util.*;
+
+// Abstract Room class
 abstract class Room {
     private String type;
     private int beds;
@@ -20,58 +22,82 @@ abstract class Room {
         this.price = price;
     }
 
-    public String getType() {
-        return type;
-    }
+    public String getType() { return type; }
+    public int getBeds() { return beds; }
+    public double getPrice() { return price; }
 
-    public int getBeds() {
-        return beds;
-    }
-
-    public double getPrice() {
-        return price;
-    }
-
-    // Abstract method
     public abstract void displayDetails();
 }
 
-// Single Room
+// Concrete Rooms
 class SingleRoom extends Room {
-    public SingleRoom() {
-        super("Single Room", 1, 2000);
-    }
+    public SingleRoom() { super("Single Room", 1, 2000); }
 
     public void displayDetails() {
-        System.out.println("Type: " + getType());
-        System.out.println("Beds: " + getBeds());
-        System.out.println("Price: ₹" + getPrice());
+        System.out.println("Type: " + getType() +
+                ", Beds: " + getBeds() +
+                ", Price: ₹" + getPrice());
     }
 }
 
-// Double Room
 class DoubleRoom extends Room {
-    public DoubleRoom() {
-        super("Double Room", 2, 3500);
-    }
+    public DoubleRoom() { super("Double Room", 2, 3500); }
 
     public void displayDetails() {
-        System.out.println("Type: " + getType());
-        System.out.println("Beds: " + getBeds());
-        System.out.println("Price: ₹" + getPrice());
+        System.out.println("Type: " + getType() +
+                ", Beds: " + getBeds() +
+                ", Price: ₹" + getPrice());
     }
 }
 
-// Suite Room
 class SuiteRoom extends Room {
-    public SuiteRoom() {
-        super("Suite Room", 3, 6000);
-    }
+    public SuiteRoom() { super("Suite Room", 3, 6000); }
 
     public void displayDetails() {
-        System.out.println("Type: " + getType());
-        System.out.println("Beds: " + getBeds());
-        System.out.println("Price: ₹" + getPrice());
+        System.out.println("Type: " + getType() +
+                ", Beds: " + getBeds() +
+                ", Price: ₹" + getPrice());
+    }
+}
+
+// Inventory (Read-only usage here)
+class RoomInventory {
+    private HashMap<String, Integer> inventory = new HashMap<>();
+
+    public RoomInventory() {
+        inventory.put("Single Room", 5);
+        inventory.put("Double Room", 3);
+        inventory.put("Suite Room", 0); // Example unavailable
+    }
+
+    public int getAvailability(String type) {
+        return inventory.getOrDefault(type, 0);
+    }
+}
+
+// Search Service (Read-only)
+class RoomSearchService {
+
+    private RoomInventory inventory;
+    private List<Room> rooms;
+
+    public RoomSearchService(RoomInventory inventory, List<Room> rooms) {
+        this.inventory = inventory;
+        this.rooms = rooms;
+    }
+
+    public void searchAvailableRooms() {
+        System.out.println("\n--- Available Rooms ---");
+
+        for (Room room : rooms) {
+            int available = inventory.getAvailability(room.getType());
+
+            // Validation: show only available rooms
+            if (available > 0) {
+                room.displayDetails();
+                System.out.println("Available: " + available + "\n");
+            }
+        }
     }
 }
 
@@ -80,29 +106,22 @@ public class BookMyStayApp{
 
     public static void main(String[] args) {
 
-        System.out.println("===== Hotel Booking System v2.1 =====");
+        System.out.println("===== Hotel Booking System v4.0 =====");
 
-        // Create room objects (Polymorphism)
-        Room r1 = new SingleRoom();
-        Room r2 = new DoubleRoom();
-        Room r3 = new SuiteRoom();
+        // Initialize inventory
+        RoomInventory inventory = new RoomInventory();
 
-        // Static availability (simple variables)
-        int singleAvailable = 5;
-        int doubleAvailable = 3;
-        int suiteAvailable = 2;
+        // Initialize room domain objects
+        List<Room> rooms = new ArrayList<>();
+        rooms.add(new SingleRoom());
+        rooms.add(new DoubleRoom());
+        rooms.add(new SuiteRoom());
 
-        // Display details
-        System.out.println("\n--- Room Details ---");
+        // Initialize search service
+        RoomSearchService searchService = new RoomSearchService(inventory, rooms);
 
-        r1.displayDetails();
-        System.out.println("Available: " + singleAvailable + "\n");
-
-        r2.displayDetails();
-        System.out.println("Available: " + doubleAvailable + "\n");
-
-        r3.displayDetails();
-        System.out.println("Available: " + suiteAvailable + "\n");
+        // Perform search (read-only)
+        searchService.searchAvailableRooms();
 
         System.out.println("Application terminated.");
     }
