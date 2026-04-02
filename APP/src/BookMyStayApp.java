@@ -1,7 +1,7 @@
 /**
  * UseCase11ConcurrentBookingSimulation
  *
- * Demonstrates thread-safe booking using synchronized methods
+ * This class demonstrates thread-safe booking using synchronization
  * to prevent race conditions and double booking.
  *
  * @author Paras
@@ -24,21 +24,18 @@ class Reservation {
     public String getRoomType() { return roomType; }
 }
 
-// Thread-Safe Queue
+// Thread-Safe Booking Queue
 class BookingQueue {
     private Queue<Reservation> queue = new LinkedList<>();
 
     public synchronized void addRequest(Reservation r) {
         queue.offer(r);
-        System.out.println("Added: " + r.getGuestName());
+        System.out.println(Thread.currentThread().getName() +
+                " added request: " + r.getGuestName());
     }
 
     public synchronized Reservation getRequest() {
         return queue.poll();
-    }
-
-    public synchronized boolean isEmpty() {
-        return queue.isEmpty();
     }
 }
 
@@ -50,7 +47,6 @@ class RoomInventory {
         inventory.put("Single Room", 2);
     }
 
-    // Critical section: allocation
     public synchronized boolean allocateRoom(String type) {
         int available = inventory.getOrDefault(type, 0);
 
@@ -66,38 +62,46 @@ class RoomInventory {
     }
 }
 
-// Booking Processor (Thread)
-class BookingProcessor extends Thread {
+// Booking Processor (Runnable)
+class BookingProcessor implements Runnable {
 
     private BookingQueue queue;
     private RoomInventory inventory;
 
-    public BookingProcessor(String name, BookingQueue queue, RoomInventory inventory) {
-        super(name);
+    public BookingProcessor(BookingQueue queue, RoomInventory inventory) {
         this.queue = queue;
         this.inventory = inventory;
     }
 
     public void run() {
         while (true) {
+            Reservation r;
 
-            Reservation r = queue.getRequest(); // already synchronized
+            // Critical section: fetch request
+            synchronized (queue) {
+                r = queue.getRequest();
+            }
 
             if (r == null) break;
 
-            boolean success = inventory.allocateRoom(r.getRoomType());
+            // Critical section: allocate room
+            synchronized (inventory) {
+                boolean success = inventory.allocateRoom(r.getRoomType());
 
-            if (success) {
-                System.out.println(getName() + " CONFIRMED: " + r.getGuestName());
-            } else {
-                System.out.println(getName() + " FAILED: " + r.getGuestName());
+                if (success) {
+                    System.out.println(Thread.currentThread().getName() +
+                            " CONFIRMED booking for " + r.getGuestName());
+                } else {
+                    System.out.println(Thread.currentThread().getName() +
+                            " FAILED booking for " + r.getGuestName());
+                }
             }
         }
     }
 }
 
 // Main Class
-public class BookMyStayApp{
+public class BookMyStayApp {
 
     public static void main(String[] args) {
 
@@ -106,15 +110,15 @@ public class BookMyStayApp{
         BookingQueue queue = new BookingQueue();
         RoomInventory inventory = new RoomInventory();
 
-        // Simulate concurrent booking requests
+        // Simulate concurrent requests
         queue.addRequest(new Reservation("Alice", "Single Room"));
         queue.addRequest(new Reservation("Bob", "Single Room"));
         queue.addRequest(new Reservation("Charlie", "Single Room"));
         queue.addRequest(new Reservation("David", "Single Room"));
 
-        // Create threads
-        BookingProcessor t1 = new BookingProcessor("Thread-1", queue, inventory);
-        BookingProcessor t2 = new BookingProcessor("Thread-2", queue, inventory);
+        // Create multiple threads
+        Thread t1 = new Thread(new BookingProcessor(queue, inventory), "Thread-1");
+        Thread t2 = new Thread(new BookingProcessor(queue, inventory), "Thread-2");
 
         // Start threads
         t1.start();
@@ -128,7 +132,6 @@ public class BookMyStayApp{
             e.printStackTrace();
         }
 
-        // Final state
         System.out.println("\nFinal Availability: " +
                 inventory.getAvailability("Single Room"));
 
