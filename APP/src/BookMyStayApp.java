@@ -1,48 +1,68 @@
 /**
- * UseCase8BookingHistoryReport
+ * UseCase11ConcurrentBookingSimulation
  *
- * This class demonstrates booking history tracking and reporting
- * using List to maintain ordered records of confirmed reservations.
+ * Demonstrates thread-safe booking using synchronized methods
+ * to prevent race conditions and double booking.
  *
  * @author Paras
- * @version 8.0
+ * @version 11.0
  */
 
 import java.util.*;
 
-// Reservation Class (Confirmed Booking)
+// Reservation Class
 class Reservation {
-    private String reservationId;
     private String guestName;
     private String roomType;
 
-    public Reservation(String reservationId, String guestName, String roomType) {
-        this.reservationId = reservationId;
+    public Reservation(String guestName, String roomType) {
         this.guestName = guestName;
         this.roomType = roomType;
     }
 
-    public String getReservationId() { return reservationId; }
     public String getGuestName() { return guestName; }
     public String getRoomType() { return roomType; }
+}
 
-    public void display() {
-        System.out.println("Reservation ID: " + reservationId +
-                ", Guest: " + guestName +
-                ", Room: " + roomType);
+// Thread-Safe Queue
+class BookingQueue {
+    private Queue<Reservation> queue = new LinkedList<>();
+
+    public synchronized void addRequest(Reservation r) {
+        queue.offer(r);
+        System.out.println("Added: " + r.getGuestName());
+    }
+
+    public synchronized Reservation getRequest() {
+        return queue.poll();
+    }
+
+    public synchronized boolean isEmpty() {
+        return queue.isEmpty();
     }
 }
 
-// Booking History (Storage)
-class BookingHistory {
+// Thread-Safe Inventory
+class RoomInventory {
+    private Map<String, Integer> inventory = new HashMap<>();
 
-    private List<Reservation> history = new ArrayList<>();
-
-    // Add confirmed booking
-    public void addReservation(Reservation r) {
-        history.add(r);
+    public RoomInventory() {
+        inventory.put("Single Room", 2);
     }
 
+    // Critical section: allocation
+    public synchronized boolean allocateRoom(String type) {
+        int available = inventory.getOrDefault(type, 0);
+
+        if (available > 0) {
+            inventory.put(type, available - 1);
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized int getAvailability(String type) {
+        return inventory.getOrDefault(type, 0);
     // Retrieve all bookings
     public List<Reservation> getAllReservations() {
         return history;
@@ -73,33 +93,32 @@ class RoomInventory {
         inventory.put("Suite Room", 2);
     }
 
-// Reporting Service
-class BookingReportService {
+// Booking Processor (Thread)
+class BookingProcessor extends Thread {
 
-    private BookingHistory history;
+    private BookingQueue queue;
+    private RoomInventory inventory;
 
-    public BookingReportService(BookingHistory history) {
-        this.history = history;
+    public BookingProcessor(String name, BookingQueue queue, RoomInventory inventory) {
+        super(name);
+        this.queue = queue;
+        this.inventory = inventory;
     }
 
-    // Display all bookings
-    public void displayAllBookings() {
-        System.out.println("\n--- Booking History ---");
+    public void run() {
+        while (true) {
 
-        for (Reservation r : history.getAllReservations()) {
-            r.display();
-        }
-    }
+            Reservation r = queue.getRequest(); // already synchronized
 
-    // Generate summary report
-    public void generateSummary() {
-        Map<String, Integer> countMap = new HashMap<>();
+            if (r == null) break;
 
-        for (Reservation r : history.getAllReservations()) {
-            String type = r.getRoomType();
-            countMap.put(type, countMap.getOrDefault(type, 0) + 1);
-        }
+            boolean success = inventory.allocateRoom(r.getRoomType());
 
+            if (success) {
+                System.out.println(getName() + " CONFIRMED: " + r.getGuestName());
+            } else {
+                System.out.println(getName() + " FAILED: " + r.getGuestName());
+            }
         System.out.println("\n--- Booking Summary Report ---");
         for (Map.Entry<String, Integer> entry : countMap.entrySet()) {
             System.out.println(entry.getKey() + " Bookings: " + entry.getValue());
@@ -131,26 +150,37 @@ public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        System.out.println("===== Hotel Booking System v8.0 =====");
+        System.out.println("===== Hotel Booking System v11.0 =====");
 
-        // Initialize history
-        BookingHistory history = new BookingHistory();
+        BookingQueue queue = new BookingQueue();
+        RoomInventory inventory = new RoomInventory();
 
-        // Simulate confirmed bookings (from UC6)
-        history.addReservation(new Reservation("SI1", "Alice", "Single Room"));
-        history.addReservation(new Reservation("SI2", "Bob", "Single Room"));
-        history.addReservation(new Reservation("DO3", "Charlie", "Double Room"));
+        // Simulate concurrent booking requests
+        queue.addRequest(new Reservation("Alice", "Single Room"));
+        queue.addRequest(new Reservation("Bob", "Single Room"));
+        queue.addRequest(new Reservation("Charlie", "Single Room"));
+        queue.addRequest(new Reservation("David", "Single Room"));
 
-        // Initialize report service
-        BookingReportService reportService = new BookingReportService(history);
+        // Create threads
+        BookingProcessor t1 = new BookingProcessor("Thread-1", queue, inventory);
+        BookingProcessor t2 = new BookingProcessor("Thread-2", queue, inventory);
 
-        // Display booking history
-        reportService.displayAllBookings();
+        // Start threads
+        t1.start();
+        t2.start();
 
-        // Generate summary
-        reportService.generateSummary();
+        // Wait for completion
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-        System.out.println("\nReporting completed (no data modified).");
+        // Final state
+        System.out.println("\nFinal Availability: " +
+                inventory.getAvailability("Single Room"));
+
         System.out.println("Application terminated.");
         System.out.println("===== Hotel Booking System v3.1 =====");
 
