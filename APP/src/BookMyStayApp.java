@@ -69,32 +69,26 @@ class AddOnServiceManager {
     }
 }
 
-// Main Class
-public class UseCase7AddOnServiceSelection {
+public class BookMyStayApp {
 
     public static void main(String[] args) {
 
         System.out.println("===== Hotel Booking System v7.0 =====");
 
-        // Assume existing reservation IDs (from UC6)
         String res1 = "SI1";
         String res2 = "DO2";
 
-        // Initialize service manager
         AddOnServiceManager manager = new AddOnServiceManager();
 
-        // Create services
         AddOnService wifi = new AddOnService("WiFi", 200);
         AddOnService breakfast = new AddOnService("Breakfast", 500);
         AddOnService spa = new AddOnService("Spa", 1500);
 
-        // Add services to reservations
         manager.addService(res1, wifi);
         manager.addService(res1, breakfast);
 
         manager.addService(res2, spa);
 
-        // View services
         manager.viewServices(res1);
         manager.viewServices(res2);
 
