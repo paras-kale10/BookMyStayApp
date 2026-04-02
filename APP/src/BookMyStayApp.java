@@ -1,21 +1,14 @@
 /**
- * UseCase9ErrorHandlingValidation
+ * UseCase11ConcurrentBookingSimulation
  *
- * This class demonstrates input validation and error handling
- * using custom exceptions to ensure system reliability.
+ * Demonstrates thread-safe booking using synchronized methods
+ * to prevent race conditions and double booking.
  *
  * @author Paras
- * @version 9.0
+ * @version 11.0
  */
 
 import java.util.*;
-
-// Custom Exception
-class InvalidBookingException extends Exception {
-    public InvalidBookingException(String message) {
-        super(message);
-    }
-}
 
 // Reservation Class
 class Reservation {
@@ -31,109 +24,114 @@ class Reservation {
     public String getRoomType() { return roomType; }
 }
 
-// Inventory Class
+// Thread-Safe Queue
+class BookingQueue {
+    private Queue<Reservation> queue = new LinkedList<>();
+
+    public synchronized void addRequest(Reservation r) {
+        queue.offer(r);
+        System.out.println("Added: " + r.getGuestName());
+    }
+
+    public synchronized Reservation getRequest() {
+        return queue.poll();
+    }
+
+    public synchronized boolean isEmpty() {
+        return queue.isEmpty();
+    }
+}
+
+// Thread-Safe Inventory
 class RoomInventory {
     private Map<String, Integer> inventory = new HashMap<>();
 
     public RoomInventory() {
-        inventory.put("Single Room", 1);
-        inventory.put("Double Room", 1);
+        inventory.put("Single Room", 2);
     }
 
-    public boolean isValidRoomType(String type) {
-        return inventory.containsKey(type);
+    // Critical section: allocation
+    public synchronized boolean allocateRoom(String type) {
+        int available = inventory.getOrDefault(type, 0);
+
+        if (available > 0) {
+            inventory.put(type, available - 1);
+            return true;
+        }
+        return false;
     }
 
-    public int getAvailability(String type) {
+    public synchronized int getAvailability(String type) {
         return inventory.getOrDefault(type, 0);
     }
-
-    public void decrement(String type) throws InvalidBookingException {
-        int available = getAvailability(type);
-
-        // Prevent negative inventory
-        if (available <= 0) {
-            throw new InvalidBookingException("No available rooms for: " + type);
-        }
-
-        inventory.put(type, available - 1);
-    }
 }
 
-// Validator Class
-class InvalidBookingValidator {
+// Booking Processor (Thread)
+class BookingProcessor extends Thread {
 
-    public static void validate(Reservation r, RoomInventory inventory)
-            throws InvalidBookingException {
-
-        // Validate guest name
-        if (r.getGuestName() == null || r.getGuestName().trim().isEmpty()) {
-            throw new InvalidBookingException("Guest name cannot be empty.");
-        }
-
-        // Validate room type
-        if (!inventory.isValidRoomType(r.getRoomType())) {
-            throw new InvalidBookingException("Invalid room type: " + r.getRoomType());
-        }
-
-        // Validate availability
-        if (inventory.getAvailability(r.getRoomType()) <= 0) {
-            throw new InvalidBookingException(
-                    "Room not available: " + r.getRoomType());
-        }
-    }
-}
-
-// Booking Service
-class BookingService {
-
+    private BookingQueue queue;
     private RoomInventory inventory;
 
-    public BookingService(RoomInventory inventory) {
+    public BookingProcessor(String name, BookingQueue queue, RoomInventory inventory) {
+        super(name);
+        this.queue = queue;
         this.inventory = inventory;
     }
 
-    public void processReservation(Reservation r) {
-        try {
-            // Fail-fast validation
-            InvalidBookingValidator.validate(r, inventory);
+    public void run() {
+        while (true) {
 
-            // If valid, update inventory
-            inventory.decrement(r.getRoomType());
+            Reservation r = queue.getRequest(); // already synchronized
 
-            // Confirm booking
-            System.out.println("Booking Confirmed for " + r.getGuestName() +
-                    " (" + r.getRoomType() + ")");
+            if (r == null) break;
 
-        } catch (InvalidBookingException e) {
-            // Graceful failure
-            System.out.println("Booking Failed: " + e.getMessage());
+            boolean success = inventory.allocateRoom(r.getRoomType());
+
+            if (success) {
+                System.out.println(getName() + " CONFIRMED: " + r.getGuestName());
+            } else {
+                System.out.println(getName() + " FAILED: " + r.getGuestName());
+            }
         }
     }
 }
 
 // Main Class
-public class BookMyStayApp {
+public class BookMyStayApp{
 
     public static void main(String[] args) {
 
-        System.out.println("===== Hotel Booking System v9.0 =====");
+        System.out.println("===== Hotel Booking System v11.0 =====");
 
+        BookingQueue queue = new BookingQueue();
         RoomInventory inventory = new RoomInventory();
-        BookingService service = new BookingService(inventory);
 
-        // Test cases (valid + invalid)
-        Reservation r1 = new Reservation("Alice", "Single Room"); // valid
-        Reservation r2 = new Reservation("", "Double Room");      // invalid name
-        Reservation r3 = new Reservation("Bob", "Suite Room");    // invalid type
-        Reservation r4 = new Reservation("Charlie", "Single Room"); // may fail (no availability)
+        // Simulate concurrent booking requests
+        queue.addRequest(new Reservation("Alice", "Single Room"));
+        queue.addRequest(new Reservation("Bob", "Single Room"));
+        queue.addRequest(new Reservation("Charlie", "Single Room"));
+        queue.addRequest(new Reservation("David", "Single Room"));
 
-        service.processReservation(r1);
-        service.processReservation(r2);
-        service.processReservation(r3);
-        service.processReservation(r4);
+        // Create threads
+        BookingProcessor t1 = new BookingProcessor("Thread-1", queue, inventory);
+        BookingProcessor t2 = new BookingProcessor("Thread-2", queue, inventory);
 
-        System.out.println("\nSystem continues running safely.");
+        // Start threads
+        t1.start();
+        t2.start();
+
+        // Wait for completion
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Final state
+        System.out.println("\nFinal Availability: " +
+                inventory.getAvailability("Single Room"));
+
         System.out.println("Application terminated.");
     }
 }
