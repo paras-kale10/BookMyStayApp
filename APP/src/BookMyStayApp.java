@@ -63,8 +63,35 @@ class RoomInventory {
 
     public synchronized int getAvailability(String type) {
         return inventory.getOrDefault(type, 0);
+    // Retrieve all bookings
+    public List<Reservation> getAllReservations() {
+        return history;
+ * UseCase3InventorySetup
+ *
+ * This class demonstrates centralized room inventory management
+ * using HashMap as a single source of truth.
+ *
+ * @author Paras
+ * @version 3.1
+ */
+
+import java.util.HashMap;
+import java.util.Map;
+
+// Inventory Class
+class RoomInventory {
+
+    private HashMap<String, Integer> inventory;
+
+    // Constructor - initialize inventory
+    public RoomInventory() {
+        inventory = new HashMap<>();
+
+        // Register room types with availability
+        inventory.put("Single Room", 5);
+        inventory.put("Double Room", 3);
+        inventory.put("Suite Room", 2);
     }
-}
 
 // Booking Processor (Thread)
 class BookingProcessor extends Thread {
@@ -92,12 +119,34 @@ class BookingProcessor extends Thread {
             } else {
                 System.out.println(getName() + " FAILED: " + r.getGuestName());
             }
+        System.out.println("\n--- Booking Summary Report ---");
+        for (Map.Entry<String, Integer> entry : countMap.entrySet()) {
+            System.out.println(entry.getKey() + " Bookings: " + entry.getValue());
+    // Get availability
+    public int getAvailability(String roomType) {
+        return inventory.getOrDefault(roomType, 0);
+    }
+
+    // Update availability (controlled method)
+    public void updateAvailability(String roomType, int count) {
+        if (inventory.containsKey(roomType)) {
+            inventory.put(roomType, count);
+        } else {
+            System.out.println("Room type not found!");
+        }
+    }
+
+    // Display inventory
+    public void displayInventory() {
+        System.out.println("\n--- Current Room Inventory ---");
+        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
+            System.out.println(entry.getKey() + " : " + entry.getValue());
         }
     }
 }
 
 // Main Class
-public class BookMyStayApp{
+public class BookMyStayApp {
 
     public static void main(String[] args) {
 
@@ -133,5 +182,24 @@ public class BookMyStayApp{
                 inventory.getAvailability("Single Room"));
 
         System.out.println("Application terminated.");
+        System.out.println("===== Hotel Booking System v3.1 =====");
+
+        // Initialize inventory
+        RoomInventory inventory = new RoomInventory();
+
+        // Display initial inventory
+        inventory.displayInventory();
+
+        // Access availability (O(1) lookup)
+        System.out.println("\nSingle Room Available: " +
+                inventory.getAvailability("Single Room"));
+
+        // Update availability (controlled)
+        inventory.updateAvailability("Single Room", 4);
+
+        // Display updated inventory
+        inventory.displayInventory();
+
+        System.out.println("\nApplication terminated.");
     }
 }
